@@ -282,7 +282,6 @@ initialize()
 		table_set FILE $index "$file"
 		parse_file $index "$file"
 		list_prepend KEYS $index	# prepend to match rcorder(8)
-		KEYS="$index ${KEYS}"	
 		index=$(( $index + 1 ))
 	done
 
