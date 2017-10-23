@@ -359,7 +359,6 @@ tsort_dfs()
 			else
 				list_pop STACK
 				set_add BLACK $j
-				file=$(table_get FILE $j)
 				list_append SORTED $j
 			fi
 		done
