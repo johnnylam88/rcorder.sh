@@ -63,7 +63,7 @@ list_append()
 	else
 		value="$@"
 	fi
-#	$debug "$list = [ $value ]"
+	$debug "$list = [ $value ]"
 	eval "$list='$value'"
 }
 
@@ -78,7 +78,7 @@ list_prepend()
 	else
 		value="$@"
 	fi
-#	$debug "$list = [ $value ]"
+	$debug "$list = [ $value ]"
 	eval "$list='$value'"
 }
 
@@ -92,7 +92,7 @@ list_pop()
 	*" "*)	value=${value% *} ;;
 	*)	value= ;;
 	esac
-#	$debug "$list = [ $value ]"
+	$debug "$list = [ $value ]"
 	eval "$list='$value'"
 }
 
@@ -121,10 +121,10 @@ set_add()
 			# $element is a member of the set.
 			result=1 ;;
 		*)	if [ -n "$value" ]; then
-#				$debug "$_set += { $element }"
+				$debug "$_set += { $element }"
 				value="$value $element"
 			else
-#				$debug "$_set = { $element }"
+				$debug "$_set = { $element }"
 				value="$element"
 			fi ;;
 		esac
@@ -177,7 +177,7 @@ table_set()
 	local old_value
 	eval old_value=\"\${$var}\"
 	if [ "$old_value" != "$value" ]; then
-#		$debug "$table[$key] = $value"
+		$debug "$table[$key] = $value"
 		eval "$var='$value'"
 		return 0
 	fi
