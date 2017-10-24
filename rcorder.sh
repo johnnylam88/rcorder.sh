@@ -50,6 +50,7 @@ debug()
 # A set is a list whose elements are unique.
 #
 #	set_add
+#	set_remove
 #	set_has_member
 
 list_append()
@@ -133,6 +134,35 @@ set_add()
 	return $result
 }
 
+set_remove()
+{
+	local _set="$1"; shift
+	local value element
+	eval value=\"\${$_set}\"
+	local old_value="$value"
+	local removed
+	for element; do
+		removed=
+		case " $value " in
+		" $element ")
+			# $element is the sole member.
+			removed="yes"; value= ;;
+		" $element "*)
+			# $element is the first member listed.
+			removed="yes"; value=${value#* } ;;
+		*" $element ")
+			# $element is the last member listed.
+			removed="yes"; value=${value% *} ;;
+		*" $element "*)
+			# $element is somewhere in the middle of the list.
+			removed="yes"
+			value="${value% $element *} ${value#* $element }" ;;
+		esac
+		[ -z "$removed" ] || $debug "$_set -= { $element }"
+	done
+	[ "$old_value" = "$value" ] || eval "$_set='$value'"
+}
+
 set_has_member()
 {
 	local _set="$1"; shift
@@ -211,6 +241,8 @@ table_set()
 #
 # SKIP_LIST is a list of keywords, none of which can be listed in
 #	KEYWORD[n] for FILE[n] to be emitted to standard output.
+#
+# SORTED is the list of keys in topological order.
 
 KEYS=
 KEEP_LIST=
@@ -285,39 +317,54 @@ initialize()
 		index=$(( $index + 1 ))
 	done
 
-	# Convert BEFORE into REQUIRE by observing that "a BEFORE b"
-	# is equivalent to "b REQUIRE a" with respect to topological
-	# sorting.
+	# Convert BEFORE into REQUIRE and vice-versa by observing that
+	# "a BEFORE b" is equivalent to "b REQUIRE a" with respect to
+	# topological sorting.
 	#
 	local i j keys
-	local before before_list provide_list require_list
+	local provide_list before before_list require require_list
 	for i in ${KEYS}; do
+		provide_list=$(table_get PROVIDE $i)	# guaranteed non-empty
+
 		before_list=$(table_get BEFORE $i)
-		[ -n "$before_list" ] || continue
-		provide_list=$(table_get PROVIDE $i)
-		# $provide_list is guaranteed to be non-empty.
-		for before in $before_list; do
-			keys=$(table_get PROVIDER $before)
-			for j in $keys; do
-				require_list=$(table_get REQUIRE $j)
-				set_add require_list $provide_list
-				table_set REQUIRE $j "$require_list"
+		if [ -n "$before_list" ]; then
+			for before in $before_list; do
+				keys=$(table_get PROVIDER $before)
+				for j in $keys; do
+					require_list=$(table_get REQUIRE $j)
+					set_add require_list $provide_list
+					table_set REQUIRE $j "$require_list"
+				done
 			done
-		done
+		fi
+
+		require_list=$(table_get REQUIRE $i)
+		if [ -n "$require_list" ]; then
+			for require in $require_list; do
+				keys=$(table_get PROVIDER $require)
+				for j in $keys; do
+					before_list=$(table_get BEFORE $j)
+					set_add before_list $provide_list
+					table_set BEFORE $j "$before_list"
+				done
+			done
+		fi
 	done
 
-	# POSTCONDITION: The REQUIRE table holds the entire directed
-	#	graph between provisions.
+	# POSTCONDITION: The REQUIRE and BEFORE tables each hold the entire
+	#	directed graph between provisions.
 }
 
 tsort_dfs()
 {
 	# Non-recursive implementation of topological sort using DFS.
 
+	# Global list of nodes in topological order.
+	SORTED=
+
 	local STACK=	# stack of visited nodes
 	local GREY=	# visited nodes whose children need to be visited
 	local BLACK=	# visited nodes whose children have been visited
-	local SORTED=	# sorted list of nodes (by key)
 
 	local i j k keys
 	local require require_list
@@ -362,7 +409,56 @@ tsort_dfs()
 			fi
 		done
 	done
-	echo "${SORTED}"
+	return 0
+}
+
+tsort_kahn()
+{
+	# Topological sort using Kahn's algorithm.
+
+	# Global list of nodes in topological order.
+	SORTED=
+
+	# Populate ${SOURCES} with nodes with no incoming edges.
+	local SOURCES=
+	local i
+	for i in ${KEYS}; do
+		before_list=$(table_get BEFORE $i)
+		[ -n "$before_list" ] || set_add SOURCES $i
+	done
+
+	local j keys
+	local provide_list require require_list before_list
+	while [ -n "${SOURCES}" ]; do
+		$debug "<looping>: [ ${SOURCES} ]"
+		i=$(list_top SOURCES); list_pop SOURCES
+		list_prepend SORTED $i
+		provide_list=$(table_get PROVIDE $i)	# guaranteed non-empty
+		require_list=$(table_get REQUIRE $i)
+		[ -n "$require_list" ] || continue
+		table_set REQUIRE $i ""
+		for require in $require_list; do
+			keys=$(table_get PROVIDER $require)
+			for j in $keys; do
+				# remove edges from $i to $j
+				before_list=$(table_get BEFORE $j)
+				set_remove before_list $provide_list
+				table_set BEFORE $j "$before_list"
+				[ -n "$before_list" ] || set_add SOURCES $j
+			done
+		done
+	done
+	# If the graph still has edges, it's not acyclic.
+	local file
+	for i in ${KEYS}; do
+		before_list=$(table_get BEFORE $i)
+		if [ -n "$before_list" ]; then
+			file=$(table_get FILE $i)
+			echo 1>&2 "Circular dependency on file $file, aborting."
+			return 1
+		fi
+	done
+	return 0
 }
 
 keep_ok()
@@ -422,11 +518,21 @@ main()
 	done
 	shift $(( ${OPTIND} - 1 ))
 
+	: ${RCORDER_TSORT:=dfs}
+
+	local tsort
+	case ${RCORDER_TSORT} in
+	dfs)	tsort="tsort_dfs" ;;
+	kahn)	tsort="tsort_kahn" ;;
+	*)	echo 1>&2 "${SELF}: unknown algorithm '${RCORDER_TSORT}', using 'dfs'"
+		tsort="tsort_dfs" ;;
+	esac
+
 	initialize "$@"
-	local keys="$(tsort_dfs)" || return 1
+	$tsort || return 1
 
 	local i keyword_list file
-	for i in $keys; do
+	for i in ${SORTED}; do
 		keyword_list=$(table_get KEYWORD $i)
 		if skip_ok $keyword_list && keep_ok $keyword_list; then
 			file=$(table_get FILE $i)
