@@ -451,58 +451,6 @@ tsort_dfs()
 	return 0
 }
 
-tsort_kahn()
-{
-	# Topological sort using Kahn's algorithm.
-
-	# Global list of nodes in topological order.
-	SORTED=
-
-	# Populate ${SOURCES} with nodes with no incoming edges.
-	SOURCES=
-	i=
-	for i in ${KEYS}; do
-		before_list=$(table_get BEFORE "${i}")
-		[ -n "${before_list}" ] || set_add SOURCES "${i}"
-	done
-
-	j=; keys=
-	provide_list=; require=; require_list=; before_list=
-	while [ -n "${SOURCES}" ]; do
-		${debug} "<looping>: [ ${SOURCES} ]"
-		i=$(list_top SOURCES); list_pop SOURCES
-		list_prepend SORTED "${i}"
-		provide_list=$(table_get PROVIDE "${i}")	# guaranteed non-empty
-		require_list=$(table_get REQUIRE "${i}")
-		[ -n "${require_list}" ] || continue
-		table_set REQUIRE "${i}" ""
-		for require in ${require_list}; do
-			keys=$(table_get PROVIDER "${require}")
-			for j in ${keys}; do
-				# remove edges from $i to $j
-				before_list=$(table_get BEFORE "${j}")
-				# shellcheck disable=SC2086
-				set_remove before_list ${provide_list}
-				table_set BEFORE "${j}" "${before_list}"
-				[ -n "${before_list}" ] || set_add SOURCES "${j}"
-			done
-		done
-	done
-
-	# If the graph still has edges, it's not acyclic.
-	file=
-	for i in ${KEYS}; do
-		before_list=$(table_get BEFORE "${i}")
-		if [ -n "${before_list}" ]; then
-			file=$(table_get FILE "${i}")
-			echo 1>&2 "Circular dependency on file ${file}, aborting."
-			return 1
-		fi
-	done
-
-	return 0
-}
-
 keep_ok()
 {
 	# Return 0 if any of the keywords in the parameters are
@@ -566,9 +514,6 @@ main()
 	case ${RCORDER_TSORT} in
 	dfs)
 		tsort="tsort_dfs"
-		;;
-	kahn)
-		tsort="tsort_kahn"
 		;;
 	*)
 		echo 1>&2 "${SELF}: unknown algorithm '${RCORDER_TSORT}', using 'dfs'"
