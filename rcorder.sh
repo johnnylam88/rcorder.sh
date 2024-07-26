@@ -55,126 +55,157 @@ debug()
 
 list_append()
 {
-	local list="$1"; shift
-	local value
-	eval value=\"\${$list}\"
-	if [ -n "$value" ]; then
+	_rcla_list=${1}; shift
+	_rcla_value=
+
+	eval _rcla_value='${'"${_rcla_list}"'}'
+	if [ -n "${_rcla_value}" ]; then
 		# add to end of list
-		value="$value ""$@"
+		_rcla_value="${_rcla_value} ${*}"
 	else
-		value="$@"
+		_rcla_value=${*}
 	fi
-	$debug "$list = [ $value ]"
-	eval "$list='$value'"
+	${debug} "${_rcla_list} = [ ${_rcla_value} ]"
+	eval "${_rcla_list}"='"${_rcla_value}"'
 }
 
 list_prepend()
 {
-	local list="$1"; shift
-	local value
-	eval value=\"\${$list}\"
-	if [ -n "$value" ]; then
+	_rclp_list=${1}; shift
+	_rclp_value=
+
+	eval _rclp_value='${'"${_rclp_list}"'}'
+	if [ -n "${_rclp_value}" ]; then
 		# add to head of list
-		value="$@"" $value"
+		_rclp_value="${*} ${_rclp_value}"
 	else
-		value="$@"
+		_rclp_value=${*}
 	fi
-	$debug "$list = [ $value ]"
-	eval "$list='$value'"
+	${debug} "${_rclp_list} = [ ${_rclp_value} ]"
+	eval "${_rclp_list}"='"${_rclp_value}"'
 }
 
 list_pop()
 {
-	local list="$1"; shift
-	local value
-	eval value=\"\${$list}\"
+	_rclpop_list=${1}; shift
+	_rclpop_value=
+
+	eval _rclpop_value='${'"${_rclpop_list}"'}'
 	# remove last element of list
-	case $value in
-	*" "*)	value=${value% *} ;;
-	*)	value= ;;
+	case ${_rclpop_value} in
+	*" "*)
+		_rclpop_value=${_rclpop_value% *}
+		;;
+	*)
+		_rclpop_value=
+		;;
 	esac
-	$debug "$list = [ $value ]"
-	eval "$list='$value'"
+	${debug} "${_rclpop_list} = [ ${_rclpop_value} ]"
+	eval "${_rclpop_list}"='"${_rclpop_value}"'
 }
 
 list_top()
 {
-	local list="$1"; shift
-	local value top
-	eval value=\"\${$list}\"
+	_rclt_list=${1}; shift
+	_rclt_value=
+	_rclt_top=
+
+	eval _rclt_value='${'"${_rclt_list}"'}'
 	# get last element of list
-	case $value in
-	*" "*)	top=${value##* } ;;
-	*)	top=$value ;;
+	case ${_rclt_value} in
+	*" "*)
+		_rclt_top=${_rclt_value##* }
+		;;
+	*)
+		_rclt_top=${_rclt_value}
+		;;
 	esac
-	echo "$top"
+	echo "${_rclt_top}"
 }
 
 set_add()
 {
-	local _set="$1"; shift
-	local value element
-	eval value=\"\${$_set}\"
-	local result=0
-	for element; do
-		case " $value " in
-		*" $element "*)
-			# $element is a member of the set.
-			result=1 ;;
-		*)	if [ -n "$value" ]; then
-				$debug "$_set += { $element }"
-				value="$value $element"
+	_rcsa_set=${1}; shift
+	_rcsa_value=
+	_rcsa_element=
+	_rcsa_result=0
+
+	eval _rcsa_value='${'"${_rcsa_set}"'}'
+	for _rcsa_element; do
+		case " ${_rcsa_value} " in
+		*" ${_rcsa_element} "*)
+			# element is a member of the set.
+			_rcsa_result=1
+			;;
+		*)
+			if [ -n "${_rcsa_value}" ]; then
+				${debug} "${_rcsa_set} += { ${_rcsa_element} }"
+				_rcsa_value="${_rcsa_value} ${_rcsa_element}"
 			else
-				$debug "$_set = { $element }"
-				value="$element"
-			fi ;;
+				${debug} "${_rcsa_set} = { ${_rcsa_element} }"
+				_rcsa_value=${_rcsa_element}
+			fi
+			;;
 		esac
 	done
-	[ -z "$value" ] || eval "$_set='$value'"
-	return $result
+	[ -z "${_rcsa_value}" ] || eval "${_rcsa_set}"='"${_rcsa_value}"'
+
+	return ${_rcsa_result}
 }
 
 set_remove()
 {
-	local _set="$1"; shift
-	local value element
-	eval value=\"\${$_set}\"
-	local old_value="$value"
-	local removed
-	for element; do
-		removed=
-		case " $value " in
-		" $element ")
-			# $element is the sole member.
-			removed="yes"; value= ;;
-		" $element "*)
-			# $element is the first member listed.
-			removed="yes"; value=${value#* } ;;
-		*" $element ")
-			# $element is the last member listed.
-			removed="yes"; value=${value% *} ;;
-		*" $element "*)
+	_rcsr_set=${1}; shift
+	_rcsr_value=
+	_rcsr_element=
+
+	eval _rcsr_value='${'"${_rcsr_set}"'}'
+	_rcsr_old_value=${_rcsr_value}
+	_rcsr_removed=
+	for _rcsr_element; do
+		_rcsr_removed=
+		case " ${_rcsr_value} " in
+		" ${_rcsr_element} ")
+			# element is the sole member.
+			_rcsr_removed=yes; _rcsr_value=
+			;;
+		" ${_rcsr_element} "*)
+			# element is the first member listed.
+			_rcsr_removed=yes; _rcsr_value=${_rcsr_value#* }
+			;;
+		*" ${_rcsr_element} ")
+			# element is the last member listed.
+			_rcsr_removed=yes; _rcsr_value=${_rcsr_value% *}
+			;;
+		*" ${_rcsr_element} "*)
 			# $element is somewhere in the middle of the list.
-			removed="yes"
-			value="${value% $element *} ${value#* $element }" ;;
+			_rcsr_removed=yes
+			_rcsr_value="${_rcsr_value% "${_rcsr_element}" *} ${_rcsr_value#* "${_rcsr_element}" }"
+			;;
 		esac
-		[ -z "$removed" ] || $debug "$_set -= { $element }"
+		[ -z "${_rcsr_removed}" ] || ${debug} "${_rcsr_set} -= { ${_rcsr_element} }"
 	done
-	[ "$old_value" = "$value" ] || eval "$_set='$value'"
+	[ "${_rcsr_old_value}" = "${_rcsr_value}" ] || eval "${_rcsr_set}"='"${_rcsr_value}"'
 }
 
 set_has_member()
 {
-	local _set="$1"; shift
-	local value element
-	eval value=\"\${$_set}\"
-	for element; do
-		case " $value " in
-		*" $element "*)
-			: "$element is a member of the set" ;;
-		*)	return 1 ;;
+	_rcshm_set=${1}; shift
+	_rcshm_value=
+	_rcshm_element=
+
+	eval _rcshm_value='${'"${_rcshm_set}"'}'
+	for _rcshm_element; do
+		case " ${_rcshm_value} " in
+		*" ${_rcshm_element} "*)
+			: "element is a member of the set"
+			;;
+		*)
+			return 1
+			;;
 		esac
 	done
+
 	return 0
 }
 
@@ -192,23 +223,25 @@ set_has_member()
 
 table_get()
 {
-	local table="$1"; shift
-	local key="$1"; shift
-	local var="${table}___${key}"
-	eval echo \"\${$var}\"
+	_rctg_table=${1}; shift
+	_rctg_key=${1}; shift
+	_rctg_var="${_rctg_table}___${_rctg_key}"
+
+	eval echo '${'"${_rctg_var}"'}'
 }
 
 table_set()
 {
-	local table="$1"; shift
-	local key="$1"; shift
-	local value="$1"; shift
-	local var="${table}___${key}"
-	local old_value
-	eval old_value=\"\${$var}\"
-	if [ "$old_value" != "$value" ]; then
-		$debug "$table[$key] = $value"
-		eval "$var='$value'"
+	_rcts_table=${1}; shift
+	_rcts_key=${1}; shift
+	_rcts_value=${1}; shift
+	_rcts_var="${_rcts_table}___${_rcts_key}"
+
+	_rcts_old_value=
+	eval _rcts_old_value='${'"${_rcts_var}"'}'
+	if [ "${_rcts_old_value}" != "${_rcts_value}" ]; then
+		${debug} "${_rcts_table}[${_rcts_key}] = ${_rcts_value}"
+		eval "${_rcts_var}"='"${_rcts_value}"'
 		return 0
 	fi
 	return 1
@@ -252,49 +285,49 @@ SKIP_LIST=
 
 parse_file()
 {
-	local index="$1"; shift
-	local file="$1"; shift
+	index=${1}; shift
+	file=${1}; shift
 
 	# Initialize to empty strings to override any inherited values.
-	local table
 	for table in BEFORE KEYWORD PROVIDE REQUIRE; do
-		table_set $table $index ""
+		table_set "${table}" "${index}" ""
 	done
 
 	# Scan through the file looking for a block containing a series
 	# of "REQUIRE", "PROVIDE", "BEFORE", and "KEYWORD" lines.
-	local found=
-	local line table list provision keys
-	while IFS= read line; do
-		case $line in
+	found=
+	line=; table=; list=; provision=; keys=
+	while IFS= read -r line; do
+		case ${line} in
 		"# BEFORE: "*|\
 		"# KEYWORD: "*|"# KEYWORDS: "*|\
 		"# PROVIDE: "*|"# PROVIDES: "*|\
 		"# REQUIRE: "*|"# REQUIRES: "*)
-			found="yes"
+			found=yes
 			table=${line#* }; table=${table%%:*}; table=${table%S}
 			list=${line#*: }
-			if [ "$table" = "PROVIDE" ]; then
+			if [ "${table}" = "PROVIDE" ]; then
 				# Set a placeholder provision so that every
 				# file provides *something* that can be
 				# listed in REQUIRE.
-				: ${list:=__rcorder_$index}
-				for provision in $list; do
-					keys=$(table_get PROVIDER $provision)
-					set_add keys $index
-					table_set PROVIDER $provision "$keys"
+				: "${list:=__rcorder_${index}}"
+				for provision in ${list}; do
+					keys=$(table_get PROVIDER "${provision}")
+					set_add keys "${index}"
+					table_set PROVIDER "${provision}" "${keys}"
 				done
 			fi
-			[ -z "$list" ] || table_set "$table" "$index" "$list" ;;
+			[ -z "${list}" ] || table_set "${table}" "${index}" "${list}"
+			;;
 		*)
-			if [ -z "$found" ]; then
+			if [ -z "${found}" ]; then
 				continue
-			else
-				# read past the block, so stop parsing
-				break
-			fi ;;
+			fi
+			# read past the block, so stop parsing
+			break
+			;;
 		esac
-	done < $file
+	done < "${file}"
 }
 
 initialize()
@@ -306,46 +339,49 @@ initialize()
 	# Parse files for keyword blocks.
 	# Set KEYS to complete list of valid keys into FILE table.
 	#
-	local file
-	local index=1
-	while [ $# -gt 0 ]; do
-		file="$1"; shift
-		[ -f "$file" ] || continue
-		table_set FILE $index "$file"
-		parse_file $index "$file"
-		list_prepend KEYS $index	# prepend to match rcorder(8)
-		index=$(( $index + 1 ))
+	file=
+	index=1
+	while [ ${#} -gt 0 ]; do
+		file=${1}; shift
+		[ -f "${file}" ] || continue
+		table_set FILE "${index}" "${file}"
+		parse_file "${index}" "${file}"
+		list_prepend KEYS "${index}"	# prepend to match rcorder(8)
+		index=$(( index + 1 ))
 	done
 
 	# Convert BEFORE into REQUIRE and vice-versa by observing that
 	# "a BEFORE b" is equivalent to "b REQUIRE a" with respect to
 	# topological sorting.
 	#
-	local i j keys
-	local provide_list before before_list require require_list
-	for i in ${KEYS}; do
-		provide_list=$(table_get PROVIDE $i)	# guaranteed non-empty
+	i=; j=; keys=
+	provide_list=; before=; before_list=; require=; require_list=
 
-		before_list=$(table_get BEFORE $i)
-		if [ -n "$before_list" ]; then
-			for before in $before_list; do
-				keys=$(table_get PROVIDER $before)
-				for j in $keys; do
-					require_list=$(table_get REQUIRE $j)
-					set_add require_list $provide_list
-					table_set REQUIRE $j "$require_list"
+	for i in ${KEYS}; do
+		provide_list=$(table_get PROVIDE "${i}")	# guaranteed non-empty
+
+		before_list=$(table_get BEFORE "${i}")
+		if [ -n "${before_list}" ]; then
+			for before in ${before_list}; do
+				keys=$(table_get PROVIDER "${before}")
+				for j in ${keys}; do
+					require_list=$(table_get REQUIRE "${j}")
+					# shellcheck disable=SC2086
+					set_add require_list ${provide_list}
+					table_set REQUIRE "${j}" "${require_list}"
 				done
 			done
 		fi
 
-		require_list=$(table_get REQUIRE $i)
-		if [ -n "$require_list" ]; then
-			for require in $require_list; do
-				keys=$(table_get PROVIDER $require)
-				for j in $keys; do
-					before_list=$(table_get BEFORE $j)
-					set_add before_list $provide_list
-					table_set BEFORE $j "$before_list"
+		require_list=$(table_get REQUIRE "${i}")
+		if [ -n "${require_list}" ]; then
+			for require in ${require_list}; do
+				keys=$(table_get PROVIDER "${require}")
+				for j in ${keys}; do
+					before_list=$(table_get BEFORE "${j}")
+					# shellcheck disable=SC2086
+					set_add before_list ${provide_list}
+					table_set BEFORE "${j}" "${before_list}"
 				done
 			done
 		fi
@@ -362,53 +398,56 @@ tsort_dfs()
 	# Global list of nodes in topological order.
 	SORTED=
 
-	local STACK=	# stack of visited nodes
-	local GREY=	# visited nodes whose children need to be visited
-	local BLACK=	# visited nodes whose children have been visited
+	STACK=	# stack of visited nodes
+	# shellcheck disable=SC2034
+	GREY=	# visited nodes whose children need to be visited
+	# shellcheck disable=SC2034
+	BLACK=	# visited nodes whose children have been visited
 
-	local i j k keys
-	local require require_list
-	local file
+	i=; j=; k=; keys=
+	require=; require_list=
+	file=
+
 	for i in ${KEYS}; do
-		set_has_member BLACK $i && continue
-		if set_has_member GREY $i; then
-			file=$(table_get FILE $i)
-			echo 1>&2 "Circular dependency on file $file, aborting."
+		set_has_member BLACK "${i}" && continue
+		if set_has_member GREY "${i}"; then
+			file=$(table_get FILE "${i}")
+			echo 1>&2 "Circular dependency on file ${file}, aborting."
 			return 1
 		fi
-		list_append STACK $i
+		list_append STACK "${i}"
 
 		while [ -n "${STACK}" ]; do
 			j=$(list_top STACK)
-			if set_has_member BLACK $j; then
+			if set_has_member BLACK "${j}"; then
 				list_pop STACK
 				continue
 			fi
-			if set_add GREY $j; then
-				require_list=$(table_get REQUIRE $j)
-				[ -n "$require_list" ] || continue
-				for require in $require_list; do
-					keys=$(table_get PROVIDER $require)
-					if [ -z "$keys" ]; then
-						echo 1>&2 "${SELF}: Requirement $require has no providers, aborting."
-						return 1
+			if set_add GREY "${j}"; then
+				require_list=$(table_get REQUIRE "${j}")
+				[ -n "${require_list}" ] || continue
+				for require in ${require_list}; do
+					keys=$(table_get PROVIDER "${require}")
+					if [ -z "${keys}" ]; then
+						echo 1>&2 "${SELF}: requirement ${require} has no providers."
 					fi
-					for k in $keys; do
-						set_has_member BLACK $k && continue
-						if set_has_member GREY $k; then
-							echo 1>&2 "Circular dependency on provision $require, aborting."
+					for k in ${keys}; do
+						set_has_member BLACK "${k}" && continue
+						if set_has_member GREY "${k}"; then
+							echo 1>&2 "Circular dependency on provision ${require}, aborting."
 							return 1
 						fi
-						list_append STACK $k
+						list_append STACK "${k}"
 					done
 				done
 			else
 				list_pop STACK
-				set_add BLACK $j
-				list_append SORTED $j
+				set_add BLACK "${j}"
+				list_append SORTED "${j}"
 			fi
 		done
 	done
+
 	return 0
 }
 
@@ -420,44 +459,47 @@ tsort_kahn()
 	SORTED=
 
 	# Populate ${SOURCES} with nodes with no incoming edges.
-	local SOURCES=
-	local i
+	SOURCES=
+	i=
 	for i in ${KEYS}; do
-		before_list=$(table_get BEFORE $i)
-		[ -n "$before_list" ] || set_add SOURCES $i
+		before_list=$(table_get BEFORE "${i}")
+		[ -n "${before_list}" ] || set_add SOURCES "${i}"
 	done
 
-	local j keys
-	local provide_list require require_list before_list
+	j=; keys=
+	provide_list=; require=; require_list=; before_list=
 	while [ -n "${SOURCES}" ]; do
-		$debug "<looping>: [ ${SOURCES} ]"
+		${debug} "<looping>: [ ${SOURCES} ]"
 		i=$(list_top SOURCES); list_pop SOURCES
-		list_prepend SORTED $i
-		provide_list=$(table_get PROVIDE $i)	# guaranteed non-empty
-		require_list=$(table_get REQUIRE $i)
-		[ -n "$require_list" ] || continue
-		table_set REQUIRE $i ""
-		for require in $require_list; do
-			keys=$(table_get PROVIDER $require)
-			for j in $keys; do
+		list_prepend SORTED "${i}"
+		provide_list=$(table_get PROVIDE "${i}")	# guaranteed non-empty
+		require_list=$(table_get REQUIRE "${i}")
+		[ -n "${require_list}" ] || continue
+		table_set REQUIRE "${i}" ""
+		for require in ${require_list}; do
+			keys=$(table_get PROVIDER "${require}")
+			for j in ${keys}; do
 				# remove edges from $i to $j
-				before_list=$(table_get BEFORE $j)
-				set_remove before_list $provide_list
-				table_set BEFORE $j "$before_list"
-				[ -n "$before_list" ] || set_add SOURCES $j
+				before_list=$(table_get BEFORE "${j}")
+				# shellcheck disable=SC2086
+				set_remove before_list ${provide_list}
+				table_set BEFORE "${j}" "${before_list}"
+				[ -n "${before_list}" ] || set_add SOURCES "${j}"
 			done
 		done
 	done
+
 	# If the graph still has edges, it's not acyclic.
-	local file
+	file=
 	for i in ${KEYS}; do
-		before_list=$(table_get BEFORE $i)
-		if [ -n "$before_list" ]; then
-			file=$(table_get FILE $i)
-			echo 1>&2 "Circular dependency on file $file, aborting."
+		before_list=$(table_get BEFORE "${i}")
+		if [ -n "${before_list}" ]; then
+			file=$(table_get FILE "${i}")
+			echo 1>&2 "Circular dependency on file ${file}, aborting."
 			return 1
 		fi
 	done
+
 	return 0
 }
 
@@ -467,9 +509,9 @@ keep_ok()
 	# in ${KEEP_LIST}; otherwise return 1.
 
 	if [ -n "${KEEP_LIST}" ]; then
-		local word
+		word=
 		for word; do
-			if set_has_member KEEP_LIST "$word"; then
+			if set_has_member KEEP_LIST "${word}"; then
 				return 0
 			fi
 		done
@@ -485,9 +527,9 @@ skip_ok()
 	# in ${SKIP_LIST}; otherwise return 0.
 
 	if [ -n "${SKIP_LIST}" ]; then
-		local word
+		word=
 		for word; do
-			if set_has_member SKIP_LIST "$word"; then
+			if set_has_member SKIP_LIST "${word}"; then
 				return 1
 			fi
 		done
@@ -507,39 +549,47 @@ main()
 	KEEP_LIST=
 	SKIP_LIST=
 
-	local arg
-	local OPTIND=1
-	while getopts ":k:s:" arg "$@"; do
-		case $arg in
+	arg=
+	OPTIND=1
+	while getopts ":k:s:" arg "${@}"; do
+		case ${arg} in
 		k)	set_add KEEP_LIST "${OPTARG}" ;;
 		s)	set_add SKIP_LIST "${OPTARG}" ;;
 		*)	usage ;;
 		esac
 	done
-	shift $(( ${OPTIND} - 1 ))
+	shift $(( OPTIND - 1 ))
 
-	: ${RCORDER_TSORT:=dfs}
+	: "${RCORDER_TSORT:=dfs}"
 
-	local tsort
+	tsort=
 	case ${RCORDER_TSORT} in
-	dfs)	tsort="tsort_dfs" ;;
-	kahn)	tsort="tsort_kahn" ;;
-	*)	echo 1>&2 "${SELF}: unknown algorithm '${RCORDER_TSORT}', using 'dfs'"
-		tsort="tsort_dfs" ;;
+	dfs)
+		tsort="tsort_dfs"
+		;;
+	kahn)
+		tsort="tsort_kahn"
+		;;
+	*)
+		echo 1>&2 "${SELF}: unknown algorithm '${RCORDER_TSORT}', using 'dfs'"
+		tsort="tsort_dfs"
+		;;
 	esac
 
-	initialize "$@"
-	$tsort || return 1
+	initialize "${@}"
+	${tsort} || return 1
 
-	local i keyword_list file
+	i=; keyword_list=; file=
 	for i in ${SORTED}; do
-		keyword_list=$(table_get KEYWORD $i)
-		if skip_ok $keyword_list && keep_ok $keyword_list; then
-			file=$(table_get FILE $i)
-			echo "$file"
+		keyword_list=$(table_get KEYWORD "${i}")
+		# shellcheck disable=SC2086
+		if skip_ok ${keyword_list} && keep_ok ${keyword_list}; then
+			file=$(table_get FILE "${i}")
+			echo "${file}"
 		fi
 	done
+
 	return 0
 }
 
-main "$@"
+main "${@}"
